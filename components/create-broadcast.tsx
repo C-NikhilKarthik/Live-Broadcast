@@ -146,7 +146,7 @@ export default function CreateBroadcast() {
         <div className="border-t border-t-slate-600 py-6">
           <button
             type="submit"
-            className="bg-white hover:bg-slate-100 text-black font-medium py-3 px-6 rounded-lg transition-colors duration-200"
+            className="bg-white w-full hover:bg-slate-100 text-black font-medium py-3 px-6 rounded-lg transition-colors duration-200"
           >
             Create Broadcast
           </button>

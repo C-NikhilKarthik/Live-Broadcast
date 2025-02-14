@@ -30,6 +30,7 @@ export default function Navbar() {
   const router = useRouter();
   const [requests, setRequests] = useState<Request[]>([]);
   const [showRequests, setShowRequests] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -130,45 +131,142 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-primary w-full text-white p-4 fixed top-0">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <div className="flex items-center space-x-4">
+    <nav className="bg-primary w-full text-white p-4 fixed top-0 z-50">
+      <div className="max-w-7xl mx-auto">
+        {/* Desktop and Mobile Layout */}
+        <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold">Spontaneous Meetup</h1>
+
+          {/* Hamburger Menu Button (Mobile) */}
+          {user && (
+            <button
+              className="md:hidden p-2"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                {isMenuOpen ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                )}
+              </svg>
+            </button>
+          )}
+
+          {/* Desktop Menu */}
+          {user && (
+            <div className="hidden md:flex items-center space-x-4">
+              <Image
+                height={0}
+                width={0}
+                sizes="100%"
+                src={user.photoURL || "/default-profile.png"}
+                alt="Profile"
+                className="w-8 h-8 rounded-full"
+              />
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowRequests(!showRequests)}
+                  className="bg-gray-800 p-2 rounded-md px-4 hover:bg-gray-700"
+                >
+                  Requests {requests.length > 0 && `(${requests.length})`}
+                </button>
+
+                {showRequests && requests.length > 0 && (
+                  <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl p-4">
+                    {requests.map((request) => (
+                      <div
+                        key={request.id}
+                        className="flex items-center justify-between p-2 border-b border-gray-700"
+                      >
+                        <span className="text-white">{request.userName}</span>
+                        <div className="space-x-2">
+                          <button
+                            onClick={() =>
+                              handleAccept(request.broadcastId, request)
+                            }
+                            className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleReject(request.broadcastId, request.id)
+                            }
+                            className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
 
-        {user && (
-          <div className="flex items-center space-x-4">
-            <Image
-              height={0}
-              width={0}
-              sizes="100%"
-              src={user.photoURL || "/default-profile.png"}
-              alt="Profile"
-              className="w-8 h-8 rounded-full"
-            />
+        {/* Mobile Menu */}
+        {user && isMenuOpen && (
+          <div className="md:hidden mt-4 space-y-4">
+            <div className="flex items-center space-x-4 pb-4">
+              <Image
+                height={0}
+                width={0}
+                sizes="100%"
+                src={user.photoURL || "/default-profile.png"}
+                alt="Profile"
+                className="w-8 h-8 rounded-full"
+              />
+              <span>{user.displayName}</span>
+            </div>
 
-            <div className="relative">
+            <div className="space-y-4">
               <button
                 onClick={() => setShowRequests(!showRequests)}
-                className="bg-gray-800 p-2 rounded-md px-4 hover:bg-gray-700"
+                className="w-full bg-gray-800 p-2 rounded-md px-4 hover:bg-gray-700 text-left"
               >
                 Requests {requests.length > 0 && `(${requests.length})`}
               </button>
 
               {showRequests && requests.length > 0 && (
-                <div className="absolute right-0 mt-2 w-64 bg-gray-800 rounded-lg shadow-xl p-4">
+                <div className="bg-gray-800 rounded-lg shadow-xl p-4 mt-2">
                   {requests.map((request) => (
                     <div
                       key={request.id}
-                      className="flex items-center justify-between p-2 border-b border-gray-700"
+                      className="flex flex-col space-y-2 p-2 border-b border-gray-700"
                     >
                       <span className="text-white">{request.userName}</span>
-                      <div className="space-x-2">
+                      <div className="flex space-x-2">
                         <button
                           onClick={() =>
                             handleAccept(request.broadcastId, request)
                           }
-                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm"
                         >
                           Accept
                         </button>
@@ -176,7 +274,7 @@ export default function Navbar() {
                           onClick={() =>
                             handleReject(request.broadcastId, request.id)
                           }
-                          className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm"
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm"
                         >
                           Reject
                         </button>
@@ -185,14 +283,14 @@ export default function Navbar() {
                   ))}
                 </div>
               )}
-            </div>
 
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-            >
-              Logout
-            </button>
+              <button
+                onClick={handleLogout}
+                className="w-full bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         )}
       </div>
