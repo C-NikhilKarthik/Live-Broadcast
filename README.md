@@ -1,36 +1,128 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Spontaneous Meetup
+
+A real-time chat application that allows users to create and join spontaneous meetups. Built with Next.js, Firebase, and TypeScript.
+
+## Features
+
+- 🔐 Google Authentication
+- 📢 Create and join broadcasts (meetups)
+- 💬 Real-time chat functionality
+- 👥 Request/Accept/Reject join system
+- 🌓 Dark mode interface
+- 📱 Responsive design
+
+## Tech Stack
+
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS
+- **Backend**: Firebase (Authentication, Firestore)
+- **State Management**: React Context
+- **Real-time Updates**: Firebase Listeners
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Firebase account
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/C-NikhilKarthik/Live-Broadcast
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Create a `.env.local` file in the root directory with your Firebase configuration:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+```
+
+4. Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+├── app/
+│   ├── auth-provider.tsx    # Authentication context
+│   ├── firebase.ts         # Firebase configuration
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Home page
+├── components/
+│   ├── broadcast-list.tsx  # List of available broadcasts
+│   ├── chat-room.tsx      # Chat interface
+│   ├── create-broadcast.tsx# Broadcast creation form
+│   ├── dashboard.tsx      # User dashboard
+│   ├── login.tsx          # Login component
+│   └── navbar.tsx         # Navigation bar
+└── types/
+    └── index.ts           # TypeScript interfaces
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features in Detail
 
-## Learn More
+### Authentication
 
-To learn more about Next.js, take a look at the following resources:
+- Google Sign-in integration
+- Persistent authentication state
+- Protected routes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Broadcasts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Create new meetup broadcasts
+- Join existing broadcasts
+- Real-time updates for broadcast status
 
-## Deploy on Vercel
+### Chat System
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Real-time messaging
+- Message history
+- Participant management
+- Leave chat functionality
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Request System
+
+- Send join requests
+- Accept/reject requests
+- Real-time request notifications
+
+## Firebase Structure
+
+```
+├── broadcasts/
+│   └── [broadcastId]/
+│       ├── activity
+│       ├── location
+│       ├── ownerId
+│       ├── ownerName
+│       ├── participants[]
+│       ├── active
+│       └── requests/
+│           └── [requestId]/
+│               ├── userId
+│               ├── userName
+│               └── status
+└── messages/
+    └── [messageId]/
+        ├── text
+        ├── userId
+        ├── userName
+        └── timestamp
+```
