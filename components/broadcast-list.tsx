@@ -147,7 +147,7 @@ export default function BroadcastList() {
       );
     }
 
-    if (broadcast.participants?.includes(user?.uid)) {
+    if (user?.uid && broadcast.participants?.includes(user.uid)) {
       return (
         <button
           onClick={() => router.push(`/chat/${broadcast.id}`)}
