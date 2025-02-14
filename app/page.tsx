@@ -8,7 +8,7 @@ export default function Home() {
   const { user } = useAuth();
 
   return (
-    <main className="flex h-screen flex-col items-center justify-center p-24">
+    <main className="flex min-h-screen flex-col items-center justify-center p-24">
       {user ? <Dashboard /> : <Login />}
     </main>
   );

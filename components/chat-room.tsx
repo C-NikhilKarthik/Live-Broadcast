@@ -1,6 +1,7 @@
+// components/chat-room.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/app/auth-provider";
 import { db } from "@/app/firebase";
 import {
@@ -12,11 +13,13 @@ import {
   serverTimestamp,
   doc,
   getDoc,
-  updateDoc,
   deleteDoc,
+  updateDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { DocumentData, Timestamp } from "firebase/firestore";
+import { toast } from "react-hot-toast";
+import { deleteBroadcast } from "@/utils/cleanup";
 
 interface Message {
   id: string;
@@ -31,50 +34,77 @@ interface ChatRoomProps {
 }
 
 export default function ChatRoom({ broadcastId }: ChatRoomProps) {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  // const [isLoading, setIsLoading] = useState(true);
-  const [isParticipant, setIsParticipant] = useState(false);
   const router = useRouter();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isRoomActive, setIsRoomActive] = useState(true);
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  // Check if the current user is part of the broadcast
   useEffect(() => {
-    const checkParticipation = async () => {
-      // if (!user) {
-      //   setIsLoading(false);
-      //   return;
-      // }
+    scrollToBottom();
+  }, [messages]);
 
-      try {
-        const broadcastRef = doc(db, "broadcasts", broadcastId);
-        const unsubscribe = onSnapshot(broadcastRef, (snap) => {
-          if (snap.exists()) {
-            const data = snap.data() as DocumentData;
-            if (data.participants && data.participants.includes(user?.uid)) {
-              setIsParticipant(true);
-            } else {
-              router.push("/");
-            }
-          } else {
-            router.push("/");
-          }
-          // setIsLoading(false);
-        });
+  // Check room status and handle expiration
+  const [hasShownEndMessage, setHasShownEndMessage] = useState(false);
 
-        return () => unsubscribe();
-      } catch (error) {
-        console.error("Error checking participation:", error);
-        // setIsLoading(false);
+  // Replace the existing room status effect with this one
+  useEffect(() => {
+    if (!user) return;
+
+    const broadcastRef = doc(db, "broadcasts", broadcastId);
+    const unsubscribe = onSnapshot(broadcastRef, async (snap) => {
+      if (!snap.exists()) {
+        if (!hasShownEndMessage) {
+          setHasShownEndMessage(true);
+          setIsRoomActive(false);
+          toast.error("This room has been closed");
+          router.push("/");
+        }
+        return;
       }
-    };
 
-    checkParticipation();
-  }, [broadcastId, user, router]);
+      const data = snap.data();
+      if (!data) return;
 
-  // Listen for incoming chat messages
+      // Check if user is participant
+      if (!data.participants?.includes(user.uid)) {
+        router.push("/");
+        return;
+      }
+
+      // Check end time
+      const roomEndTime = new Date(data.endTime);
+      // setEndTime(roomEndTime);
+
+      if (roomEndTime <= new Date()) {
+        if (!hasShownEndMessage) {
+          setHasShownEndMessage(true);
+          setIsRoomActive(false);
+          toast.error("This meeting has ended");
+
+          // If owner, delete the room
+          if (data.ownerId === user.uid) {
+            await deleteBroadcast(broadcastId);
+          }
+
+          router.push("/");
+        }
+        return;
+      }
+    });
+
+    // Remove the separate interval since we're handling everything in the snapshot listener
+    return () => unsubscribe();
+  }, [broadcastId, user, router, hasShownEndMessage]);
+
+  // Listen for messages
   useEffect(() => {
-    if (!user || !isParticipant) return;
+    if (!user) return;
 
     const q = query(
       collection(db, "broadcasts", broadcastId, "messages"),
@@ -83,53 +113,14 @@ export default function ChatRoom({ broadcastId }: ChatRoomProps) {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messagesData: Message[] = [];
-      snapshot.forEach((docSnap) => {
-        messagesData.push({ id: docSnap.id, ...docSnap.data() } as Message);
+      snapshot.forEach((doc) => {
+        messagesData.push({ id: doc.id, ...doc.data() } as Message);
       });
       setMessages(messagesData);
     });
 
     return () => unsubscribe();
-  }, [broadcastId, user, isParticipant]);
-
-  // Check if the current user is part of the broadcast.
-  // useEffect(() => {
-  //   const checkParticipation = async () => {
-  //     const broadcastRef = doc(db, "broadcasts", broadcastId);
-  //     const snap = await getDoc(broadcastRef);
-  //     if (snap.exists()) {
-  //       const data = snap.data() as DocumentData;
-  //       console.log("Broadcast data:", data);
-  //       if (!data.participants || !data.participants.includes(user?.uid)) {
-  //         // User is not a participant, so redirect them out.
-  //         router.push("/");
-  //       }
-  //     }
-  //   };
-
-  //   if (user) {
-  //     checkParticipation();
-  //   }
-  // }, [broadcastId, user, router]);
-
-  // Listen for incoming chat messages.
-  // useEffect(() => {
-  //   if (!user) return;
-
-  //   const q = query(
-  //     collection(db, "broadcasts", broadcastId, "messages"),
-  //     orderBy("timestamp")
-  //   );
-  //   const unsubscribe = onSnapshot(q, (snapshot) => {
-  //     const messagesData: Message[] = [];
-  //     snapshot.forEach((docSnap) => {
-  //       messagesData.push({ id: docSnap.id, ...docSnap.data() } as Message);
-  //     });
-  //     setMessages(messagesData);
-  //   });
-
-  //   return () => unsubscribe();
-  // }, [broadcastId, user]);
+  }, [broadcastId, user]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,12 +130,13 @@ export default function ChatRoom({ broadcastId }: ChatRoomProps) {
       await addDoc(collection(db, "broadcasts", broadcastId, "messages"), {
         userId: user.uid,
         userName: user.displayName,
-        text: newMessage,
+        text: newMessage.trim(),
         timestamp: serverTimestamp(),
       });
       setNewMessage("");
     } catch (error) {
       console.error("Error sending message:", error);
+      toast.error("Failed to send message");
     }
   };
 
@@ -171,90 +163,92 @@ export default function ChatRoom({ broadcastId }: ChatRoomProps) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
-      </div>
-    );
-  }
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (newMessage.trim()) {
+        handleSendMessage(e);
+      }
+    }
+  };
 
-  if (!user || !isParticipant) {
+  if (!isRoomActive) {
     return null;
   }
 
   return (
-    <div className="flex flex-col min-h-screen h-full pt-20">
-      <div className="flex-grow overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex flex-col ${
-              message.userId === user?.uid ? "items-end" : "items-start"
-            }`}
-          >
-            <span className="text-sm text-gray-400 mb-1 px-2">
-              {message.userName}
-            </span>
+    <div className="flex flex-col h-screen">
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto pt-20 pb-4 px-4">
+        <div className="space-y-4">
+          {messages.map((message) => (
             <div
-              className={`max-w-[80%] break-words ${
-                message.userId === user?.uid
-                  ? "bg-gray-800 text-white"
-                  : "bg-[#0a0a0a] text-white"
-              } rounded-2xl border border-[#ffffff1f] px-4 py-2`}
+              key={message.id}
+              className={`flex flex-col ${
+                message.userId === user?.uid ? "items-end" : "items-start"
+              }`}
             >
-              {message.text}
+              <span className="text-sm text-gray-400 mb-1 px-2">
+                {message.userName}
+              </span>
+              <div
+                className={`max-w-[80%] break-words ${
+                  message.userId === user?.uid
+                    ? "bg-gray-800 text-white"
+                    : "bg-[#0a0a0a] text-white"
+                } rounded-2xl border border-[#ffffff1f] px-4 py-2`}
+              >
+                {message.text}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <form
-        onSubmit={handleSendMessage}
-        className="bg-[#141415] mx-4 relative z-10 rounded-xl border border-[#ffffff1f]"
-      >
-        <div className="flex p-1 items-center">
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (newMessage.trim()) {
-                  handleSendMessage(e);
-                }
-              }
-            }}
-            placeholder="Type a message..."
-            spellCheck="false"
-            className="resize-none overflow-auto w-full flex-1 bg-transparent p-3 pb-1.5 text-sm outline-none ring-0 placeholder:text-gray-500"
-            style={{
-              height: "42px",
-              minHeight: "42px",
-              maxHeight: "384px",
-            }}
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center px-3 h-7 rounded-lg transition-colors text-white font-medium text-sm hover:bg-gray-800"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M14.6667 1.33334L7.33334 8.66667M14.6667 1.33334L10 14.6667L7.33334 8.66667M14.6667 1.33334L1.33334 6L7.33334 8.66667"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          ))}
+          <div ref={messagesEndRef} />
         </div>
-      </form>
-      <button
-        onClick={handleLeaveRoom}
-        className="bg-red-500 text-white px-4 py-2 rounded m-4"
-      >
-        Leave Room
-      </button>
+      </div>
+
+      {/* Fixed Bottom Section */}
+      <div className="border-t border-gray-800 bg-primary">
+        <form
+          onSubmit={handleSendMessage}
+          className="bg-[#141415] m-4 rounded-xl border border-[#ffffff1f]"
+        >
+          <div className="flex p-1 items-center">
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              spellCheck="false"
+              className="resize-none overflow-auto w-full flex-1 bg-transparent p-3 pb-1.5 text-sm outline-none ring-0 placeholder:text-gray-500"
+              style={{
+                height: "42px",
+                minHeight: "42px",
+                maxHeight: "384px",
+              }}
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center px-3 h-7 rounded-lg hover:bg-gray-800 transition-colors text-white font-medium text-sm"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M14.6667 1.33334L7.33334 8.66667M14.6667 1.33334L10 14.6667L7.33334 8.66667M14.6667 1.33334L1.33334 6L7.33334 8.66667"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </form>
+        <button
+          onClick={handleLeaveRoom}
+          className="w-full bg-red-500 hover:bg-red-600 text-white py-3 transition-colors"
+        >
+          Leave Room
+        </button>
+      </div>
     </div>
   );
 }
